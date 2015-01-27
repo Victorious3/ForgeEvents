@@ -1,0 +1,35 @@
+apply plugin: "java"
+apply plugin: "eclipse"
+
+archivesBaseName = "ForgeEvents"
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir "doclet/src"
+		}
+	} 
+}
+
+configurations {
+    releaseJars
+}
+
+dependencies {
+    compile files("/${jdkLocation}/lib/tools.jar")
+    compile "com.google.code.gson:gson:2.3.1"
+    compile "mysql:mysql-connector-java:5.1.34"
+    
+    releaseJars "com.google.code.gson:gson:2.3.1"
+    releaseJars "mysql:mysql-connector-java:5.1.34"
+}
+
+jar {
+    from configurations.releaseJars.collect { 
+    	it.isDirectory() ? it : zipTree(it) 
+    }
+}
