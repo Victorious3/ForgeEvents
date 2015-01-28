@@ -1,7 +1,6 @@
 /bin/
 /build/
 
-/script/data/
 /script/node_modules/
 
 /.settings/

@@ -39,17 +39,22 @@ if (!fs.existsSync(config.dataPath)) fs.mkdirSync(config.dataPath);
 var files = fs.readdirSync(config.dataPath);
 
 var tasks = {
-	"all" : [downloadFiles, decompress, createDoclet, createHTML],
-	"update" : [downloadFiles, decompress],
-	"doc" : [createDoclet, createHTML]
+	downloadFiles : [downloadFiles],
+	decompress : [downloadFiles],
+	createCSV : [createCSV],
+	createDoclet : [createDoclet],
+	createHTML : [createHTML],
+	
+	all : [downloadFiles, decompress, createCSV, createDoclet, createHTML],
+	update : [downloadFiles, decompress, createCSV],
+	doc : [createDoclet, createHTML]
 }
 
 var task = tasks.all;
 if (args.length > 0) {
 	if(args[0] in tasks) {
 		task = tasks[args[0]];
-	}
-	else {
+	} else {
 		console.error("Undefined task '" + args[0] + "'");
 		console.log("Tasks: " + Object.keys(tasks));
 		process.exit(-1);
@@ -92,6 +97,19 @@ function downloadFiles(gcallback) {
 		if(err) console.error(err);
 		gcallback.call();
 	});
+}
+
+function createCSV(gcallback) {
+	var csvname = config.dataPath + "/global.csv";
+	if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
+		
+	fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
+	for (var key in forgeconfig.versions) {
+		var version = forgeconfig.versions[key];
+		var csvname = config.dataPath + "/" + version.mcversion + ".csv";
+		if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
+	}
+	gcallback.call();
 }
 
 function decompress(gcallback) {
