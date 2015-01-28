@@ -7,6 +7,8 @@ var spawn 	= require('child_process').spawn;
 
 var utils 	= require("./utilities.js");
 
+var args = process.argv.slice(2);
+
 //Import JSON configuration
 var forgeconfig;
 var config;
@@ -36,9 +38,28 @@ for (var key in forgeconfig["versions"]) {
 if (!fs.existsSync(config.dataPath)) fs.mkdirSync(config.dataPath);
 var files = fs.readdirSync(config.dataPath);
 
-downloadFiles();
+var tasks = {
+	"all" : [downloadFiles, decompress, createDoclet, createHTML],
+	"update" : [downloadFiles, decompress],
+	"documentation" : [createDoclet, createHTML]
+}
 
-function downloadFiles() {
+var task = tasks.all;
+if (args.length > 0) {
+	if(args[0] in tasks) {
+		task = tasks[args[0]];
+	}
+	else {
+		console.error("Undefined task '" + args[0] + "'");
+		console.log("Tasks: " + Object.keys(tasks));
+		process.exit(-1);
+	}
+}
+
+//Run tasks
+async.series(task);
+
+function downloadFiles(gcallback) {
 	//Array of files to download asynchronous
 	var dlfiles = [];
 	for (var key in forgeconfig.versions) {
@@ -65,15 +86,15 @@ function downloadFiles() {
 			console.log("Downloading " + dlpath + " ...");
 			utils.downloadFile(dlpath, version.zipfile, callback)
 		} else {
-			callback();
+			callback.call();
 		}
 	}, function(err) {
 		if(err) console.error(err);
-		decompress();
+		gcallback.call();
 	});
 }
 
-function decompress() {
+function decompress(gcallback) {
 	for (var key in forgeconfig.versions) {
 		var version = forgeconfig.versions[key];
 		if (fs.existsSync(version.zipfile)) {
@@ -94,11 +115,10 @@ function decompress() {
 			fs.unlinkSync(version.zipfile);
 		}
 	}
+	gcallback.call();
 }
 
-createDoclet();
-
-function createDoclet() {
+function createDoclet(gcallback) {
 	var javaHome = "javaHome" in config ? config.javaHome : process.env.JAVA_HOME;
 	if(!fs.existsSync(config.docletPath)) throw "Invalid doclet path.";
 	
@@ -127,10 +147,10 @@ function createDoclet() {
 		}
 	}, function(err) {
 		if(err) console.error(err);
-		createHMTL();
+		gcallback.call();
 	})
 }
 
-function createHMTL() {
-	
+function createHTML(gcallback) {
+	gcallback.call();
 }

@@ -28,8 +28,8 @@
             "source": ["forge/client", "forge/common", "forge/fml/common"],
             "eventbus" : [
             	{"cpw.mods.fml.common.event": "fmlconstruction"},
-            	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-            	{"net.minecraftforge.terraingen": "terraingen"},
+            	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+            	{"net.minecraftforge.event.terraingen": "terraingen"},
             	{"net.minecraftforge": "forge"}
         	]
         },
@@ -45,8 +45,8 @@
             "source": ["forge/client", "forge/common", "forge/fml/common"],
             "eventbus" : [
               	{"cpw.mods.fml.common.event": "fmlconstruction"},
-              	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-              	{"net.minecraftforge.terraingen": "terraingen"},
+              	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+              	{"net.minecraftforge.event.terraingen": "terraingen"},
               	{"net.minecraftforge": "forge"}	
           	]
         },
@@ -62,8 +62,8 @@
             "source": ["forge/client", "forge/common", "forge/fml/common"],
             "eventbus" : [
             	{"cpw.mods.fml.common.event": "fmlconstruction"},
-            	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-            	{"net.minecraftforge.terraingen": "terraingen"},
+            	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+            	{"net.minecraftforge.event.terraingen": "terraingen"},
             	{"net.minecraftforge": "forge"}	
         	]           
         },
@@ -83,8 +83,8 @@
                 {"cpw.mods.fml.client.event": "fmlevent"},
                 {"cpw.mods.fml.common.gameevent": "fmlevent"},
               	{"cpw.mods.fml.common.event": "fmlconstruction"},
-              	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-              	{"net.minecraftforge.terraingen": "terraingen"},
+              	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+              	{"net.minecraftforge.event.terraingen": "terraingen"},
               	{"net.minecraftforge": "forge"}
           	]
         },
@@ -104,8 +104,8 @@
                 {"cpw.mods.fml.client.event": "fmlevent"},
                 {"cpw.mods.fml.common.gameevent": "fmlevent"},
                 {"cpw.mods.fml.common.event": "fmlconstruction"},
-                {"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-                {"net.minecraftforge.terraingen": "terraingen"},
+                {"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+                {"net.minecraftforge.event.terraingen": "terraingen"},
                 {"net.minecraftforge": "forge"}
         	]
         },
@@ -126,8 +126,8 @@
                   {"net.minecraftforge.fml.client.event": "fmlevent"},
                   {"net.minecraftforge.fml.common.gameevent": "fmlevent"},
                   {"net.minecraftforge.fml.common.event": "fmlconstruction"},
-                  {"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
-                  {"net.minecraftforge.terraingen": "terraingen"},
+                  {"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+                  {"net.minecraftforge.event.terraingen": "terraingen"},
                   {"net.minecraftforge": "forge"}
           	]
         }
