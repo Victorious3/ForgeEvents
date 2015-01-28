@@ -41,7 +41,7 @@ var files = fs.readdirSync(config.dataPath);
 var tasks = {
 	"all" : [downloadFiles, decompress, createDoclet, createHTML],
 	"update" : [downloadFiles, decompress],
-	"documentation" : [createDoclet, createHTML]
+	"doc" : [createDoclet, createHTML]
 }
 
 var task = tasks.all;

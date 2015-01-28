@@ -31,7 +31,7 @@
             	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
             	{"net.minecraftforge.event.terraingen": "terraingen"},
             	{"net.minecraftforge": "forge"}
-        	]
+            ]
         },
         {
             "mcversion": "1.5.2",
@@ -65,7 +65,7 @@
             	{"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
             	{"net.minecraftforge.event.terraingen": "terraingen"},
             	{"net.minecraftforge": "forge"}	
-        	]           
+            ]           
         },
         {
             "mcversion": "1.7.2",
@@ -123,12 +123,12 @@
             ],
             "source": ["src/main/java"],
             "eventbus" : [
-                  {"net.minecraftforge.fml.client.event": "fmlevent"},
-                  {"net.minecraftforge.fml.common.gameevent": "fmlevent"},
-                  {"net.minecraftforge.fml.common.event": "fmlconstruction"},
-                  {"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
-                  {"net.minecraftforge.event.terraingen": "terraingen"},
-                  {"net.minecraftforge": "forge"}
+                {"net.minecraftforge.fml.client.event": "fmlevent"},
+                {"net.minecraftforge.fml.common.gameevent": "fmlevent"},
+                {"net.minecraftforge.fml.common.event": "fmlconstruction"},
+                {"net.minecraftforge.event.terraingen.OreGenEvent": "oregen"},
+                {"net.minecraftforge.event.terraingen": "terraingen"},
+                {"net.minecraftforge": "forge"}
           	]
         }
     ]
