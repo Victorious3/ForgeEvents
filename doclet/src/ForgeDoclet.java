@@ -3,15 +3,18 @@ import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map.Entry;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.stream.JsonReader;
+import com.google.gson.JsonParser;
 import com.sun.javadoc.AnnotationDesc;
 import com.sun.javadoc.ClassDoc;
 import com.sun.javadoc.DocErrorReporter;
@@ -23,8 +26,8 @@ public class ForgeDoclet extends Doclet
 {
 	public static Connection mysql;
 	public static String escapedName;
-	public static Map<String, Object> config = new HashMap<String, Object>();
-	public static Map<String, Object> version = new HashMap<String, Object>();
+	public static JsonObject config;
+	public static JsonObject version;
 	
 	public static boolean start(RootDoc root)
 	{
@@ -33,12 +36,12 @@ public class ForgeDoclet extends Doclet
 		{
 			if(options[0].equals("-path")) path = options[1];
 			else if(options[0].equals("-forgeversion"))
-				version = new Gson().fromJson(options[1], version.getClass());
+				version = new JsonParser().parse(options[1]).getAsJsonObject();
 		}
 		
 		File rootFolder = new File(path);
 		try {
-			readConfiguration(new File(rootFolder + "/config.json"));
+			config = new JsonParser().parse(new FileReader(new File(rootFolder + "/config.json"))).getAsJsonObject();
 		} catch (Exception e) {
 			root.printError("No valid configuration file found in path " + rootFolder);
 			e.printStackTrace();
@@ -54,6 +57,39 @@ public class ForgeDoclet extends Doclet
 		}
 		
 		try {
+			String currentVersion = version.get("mcversion").getAsString();
+			String previousVersion = null;
+			
+			ArrayList<String> versions = new ArrayList<String>();
+			ResultSet res = executeSQLQuery("SELECT (mcversion) FROM versions");
+			while(res.next()) versions.add(res.getString(1));
+			versions.sort((a, b) -> {
+				String[] splitA = a.split("\\.");
+				String[] splitB = b.split("\\.");
+				int length = Math.max(splitA.length, splitB.length);
+				for(int i = 0; i < length; i++)
+				{
+					int digita = i < splitA.length ? Integer.parseInt(splitA[i]) : 0;
+					int digitb = i < splitB.length ? Integer.parseInt(splitB[i]) : 0;
+					if(digita > digitb) return 1;
+					else if(digita < digitb) return -1;
+				}
+				return 0;
+			});
+			int index = versions.indexOf(currentVersion);
+			if(index - 1 >= 0) previousVersion = versions.get(index - 1);
+			
+			//Escape versions for database names
+			currentVersion = currentVersion.replaceAll("\\.", "_");
+			if(previousVersion != null) 
+			{
+				root.printNotice("Previous version: " + previousVersion);
+				previousVersion = previousVersion.replaceAll("\\.", "_");
+			}
+			
+			JsonArray eventbusArray = version.get("eventbus").getAsJsonArray();
+			
+			root.printNotice("Scanning classes for Forge Events...");
 			for(ClassDoc classdoc : root.classes())
 			{
 				root.printNotice("Inspecting class " + classdoc.qualifiedName());
@@ -68,19 +104,20 @@ public class ForgeDoclet extends Doclet
 				String name = classdoc.typeName();
 				String classname = classdoc.qualifiedName();
 				String superclass = classdoc.superclass() != null ? classdoc.superclass().qualifiedName() : "java.lang.Object";
+				boolean side = classname.contains("client");
 
-				JsonArray fields = new JsonArray();
+				JsonArray fieldsJson = new JsonArray();
 				for(FieldDoc fielddoc : classdoc.fields())
 				{
 					if(fielddoc.isFinal() && fielddoc.isPublic())
 					{
 						JsonObject fieldObj = new JsonObject();
 						fieldObj.addProperty(fielddoc.name(), fielddoc.type().simpleTypeName());
-						fields.add(fieldObj);
+						fieldsJson.add(fieldObj);
 					}
 				}
-				String fieldsJson = new Gson().toJson(fields);
-				boolean isDeprecated = false;
+				String fields = new Gson().toJson(fieldsJson);
+				boolean deprecated = false;
 				
 				int result = 0;
 				for(AnnotationDesc andesc : classdoc.annotations())
@@ -89,25 +126,39 @@ public class ForgeDoclet extends Doclet
 					root.printNotice("Annotation found: " + type);
 					if(type.equals("Event.HasResult")) result |= 1;
 					if(type.equals("Cancelable")) result |= 2;
-					isDeprecated = type.equals("Deprecated");
+					deprecated = type.equals("Deprecated");
 				}
 				
 				String description = classdoc.getRawCommentText();
+				String since = escapedName;
 				
-				root.printNotice("[" + name + " fields: " + fieldsJson.toString() + ", result: " + result + ", deprecated: " + isDeprecated + "]");
+				if(previousVersion != null) 
+				{
+					res = executeSQLQuery("SELECT since FROM " + previousVersion + " WHERE name = ?", name);
+					if(res.next()) since = res.getString(1);
+					res.close();
+				}
+				
+				//Event bus
+				String eventbus = "";
+				Iterator<JsonElement> iterator = eventbusArray.iterator();
+				while(iterator.hasNext())
+				{
+					JsonObject bus = iterator.next().getAsJsonObject();
+					Entry<String, JsonElement> entry = (Entry<String, JsonElement>)bus.entrySet().toArray()[0];
+					String busPackage = entry.getKey();
+					if(classname.startsWith(busPackage)) 
+					{
+						eventbus = entry.getValue().getAsString();
+						break;
+					}
+				}
+				
+				root.printNotice("[" + name + " fields: " + fields.toString() + ", result: " + result + ", eventbus: " + eventbus + ", since: " + since + ", deprecated: " + deprecated + "]");
 				root.printNotice("Pushing to database...");
 				
-				//TODO Helper functions!
-				PreparedStatement statement = mysql.prepareStatement("INSERT INTO " + escapedName + " (name, class, superclass, fields, description, result, deprecated) VALUES (?, ?, ?, ?, ?, ?, ?)");
-				statement.setString(1, name);
-				statement.setString(2, classname);
-				statement.setString(3, superclass);
-				statement.setString(4, fieldsJson);
-				statement.setString(5, description);
-				statement.setInt(6, result);
-				statement.setBoolean(7, isDeprecated);
-				statement.executeUpdate();
-				statement.close();
+				executeSQLUpdate("INSERT INTO " + escapedName + " (name, class, superclass, fields, description, eventbus, since, result, side, deprecated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+					name, classname, superclass, fields, description, eventbus, since, result, side, deprecated);
 				
 				root.printNotice("...success!");
 			}
@@ -124,6 +175,22 @@ public class ForgeDoclet extends Doclet
 		return true;
 	}
 	
+	public static void executeSQLUpdate(String sql, Object... params) throws SQLException
+	{
+		PreparedStatement statement = mysql.prepareStatement(sql);
+		for(int i = 0; i < params.length; i++) statement.setObject(i + 1, params[i]);
+		statement.executeUpdate();
+		statement.close();
+	}
+	
+	public static ResultSet executeSQLQuery(String sql, Object... params) throws SQLException
+	{
+		PreparedStatement statement = mysql.prepareStatement(sql);
+		for(int i = 0; i < params.length; i++) statement.setObject(i + 1, params[i]);
+		statement.closeOnCompletion();
+		return statement.executeQuery();
+	}
+	
 	public static boolean isSubclassOf(ClassDoc doc, String classname)
 	{
 		while(doc != null)
@@ -134,30 +201,20 @@ public class ForgeDoclet extends Doclet
 		return false;
 	}
 	
-	public static void readConfiguration(File configFile) throws Exception
-	{
-		config = new Gson().fromJson(new JsonReader(new FileReader(configFile)), config.getClass());
-	}
-	
 	public static void connectToMySQL() throws SQLException
 	{
-		escapedName = version.get("mcversion").toString().replaceAll("\\.", "_");
-		Map<String, Object> mySQL = (Map<String, Object>)config.get("mySQL");
+		escapedName = version.get("mcversion").getAsString().replaceAll("\\.", "_");
+		JsonObject mySQL = config.get("mySQL").getAsJsonObject();
 		
-		String url = (String)mySQL.get("host");
-		String user = (String)mySQL.get("user");
-		String password = (String)mySQL.get("password");
-		String port = (String)mySQL.get("port");
-		
-		url = url != null ? url : "localhost";
-		user = user != null ? user : "root";
-		password = password != null ? password : "";
-		port = port != null ? port : "3306";
+		String url = mySQL.has("host") ? mySQL.get("host").getAsString() : "localhost";
+		String user = mySQL.has("user") ? mySQL.get("user").getAsString() : "root";
+		String password = mySQL.has("password") ? mySQL.get("password").getAsString() : "";
+		String port = mySQL.has("port") ? mySQL.get("port").getAsString() : "3306";
 		
 		mysql = DriverManager.getConnection(String.format("jdbc:mysql://%s:%s/?user=%s&password=%s", url, port, user, password));
 		Statement statement = mysql.createStatement();
-		statement.execute("CREATE DATABASE IF NOT EXISTS " + config.get("database"));
-		statement.execute("USE " + config.get("database"));
+		statement.execute("CREATE DATABASE IF NOT EXISTS " + config.get("database").getAsString());
+		statement.execute("USE " + config.get("database").getAsString());
 		statement.execute("CREATE TABLE IF NOT EXISTS " + escapedName + " ("
 			+ "id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
 			+ "name TINYTEXT NOT NULL,"
@@ -165,7 +222,7 @@ public class ForgeDoclet extends Doclet
 			+ "superclass TINYTEXT NOT NULL,"
 			+ "fields TEXT,"
 			+ "description TEXT,"
-			+ "eventbus INT(2) UNSIGNED,"
+			+ "eventbus TINYTEXT,"
 			+ "since TINYTEXT,"
 			+ "result TINYINT(1) UNSIGNED,"
 			+ "side BOOLEAN,"
@@ -173,12 +230,12 @@ public class ForgeDoclet extends Doclet
 			+ ")");
 		statement.execute("TRUNCATE TABLE " + escapedName);
 		statement.execute("CREATE TABLE IF NOT EXISTS versions ("
-			+ "id VARCHAR(10) PRIMARY KEY NOT NULL,"
-			+ "mcversion TINYTEXT NOT NULL,"
-			+ "forgeversion TINYTEXT NOT NULL,"
+			+ "tableid VARCHAR(10) NOT NULL PRIMARY KEY,"
+			+ "mcversion VARCHAR(10) NOT NULL,"
+			+ "forgeversion VARCHAR(20) NOT NULL,"
 			+ "eventbusList TEXT"
 			+ ")");
-		statement.execute("REPLACE INTO versions (id, mcversion, forgeversion) VALUES (\"" + escapedName + "\",\"" + version.get("mcversion") + "\",\"" + version.get("forgeversion") + "\")");
+		statement.execute("REPLACE INTO versions (tableid, mcversion, forgeversion) VALUES (\"" + escapedName + "\"," + version.get("mcversion") + "," + version.get("forgeversion") + ")");
 		statement.close();
 	}
 	

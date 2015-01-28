@@ -10,7 +10,11 @@
                 "forge/common/net/minecraftforge/event",
                 "forge/fml/common/cpw/mods/fml/common/event"
             ],
-            "source": ["forge/client", "forge/common", "forge/fml/common"]
+            "source": ["forge/client", "forge/common", "forge/fml/common"],
+            "eventbus" : [
+              	{"cpw.mods.fml.common.event": "fmlconstruction"},
+                {"net.minecraftforge": "forge"}
+             ]
         },
         {
             "mcversion": "1.4.7",
@@ -21,7 +25,13 @@
                 "forge/common/net/minecraftforge/event",
                 "forge/fml/common/cpw/mods/fml/common/event"
             ],
-            "source": ["forge/client", "forge/common", "forge/fml/common"]
+            "source": ["forge/client", "forge/common", "forge/fml/common"],
+            "eventbus" : [
+            	{"cpw.mods.fml.common.event": "fmlconstruction"},
+            	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+            	{"net.minecraftforge.terraingen": "terraingen"},
+            	{"net.minecraftforge": "forge"}
+        	]
         },
         {
             "mcversion": "1.5.2",
@@ -32,7 +42,13 @@
                 "forge/common/net/minecraftforge/event",
                 "forge/fml/common/cpw/mods/fml/common/event"
             ],
-            "source": ["forge/client", "forge/common", "forge/fml/common"]
+            "source": ["forge/client", "forge/common", "forge/fml/common"],
+            "eventbus" : [
+              	{"cpw.mods.fml.common.event": "fmlconstruction"},
+              	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+              	{"net.minecraftforge.terraingen": "terraingen"},
+              	{"net.minecraftforge": "forge"}	
+          	]
         },
         {
             "mcversion": "1.6.4",
@@ -43,31 +59,55 @@
                 "forge/common/net/minecraftforge/event",
                 "forge/fml/common/cpw/mods/fml/common/event"
             ],
-            "source": ["forge/client", "forge/common", "forge/fml/common"]
+            "source": ["forge/client", "forge/common", "forge/fml/common"],
+            "eventbus" : [
+            	{"cpw.mods.fml.common.event": "fmlconstruction"},
+            	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+            	{"net.minecraftforge.terraingen": "terraingen"},
+            	{"net.minecraftforge": "forge"}	
+        	]           
         },
         {
             "mcversion": "1.7.2",
             "forgeversion": "10.12.2.1147",
             "versionFormat": "{0}-{1}/forge-{0}-{1}-userdev.jar",
             "packages": [
+                "src/main/java/net/minecraftforge/client/event",
                 "src/main/java/net/minecraftforge/event",
                 "src/main/java/cpw/mods/fml/common/event",
                 "src/main/java/cpw/mods/fml/common/gameevent",
                 "src/main/java/cpw/mods/fml/client/event"
             ],
-        	"source": ["src/main/java"]
+            "source": ["src/main/java"],
+            "eventbus" : [
+                {"cpw.mods.fml.client.event": "fmlevent"},
+                {"cpw.mods.fml.common.gameevent": "fmlevent"},
+              	{"cpw.mods.fml.common.event": "fmlconstruction"},
+              	{"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+              	{"net.minecraftforge.terraingen": "terraingen"},
+              	{"net.minecraftforge": "forge"}
+          	]
         },
         {
             "mcversion": "1.7.10",
             "forgeversion": "10.13.2.1291",
             "versionFormat": "{0}-{1}/forge-{0}-{1}-userdev.jar",
             "packages": [
+                "src/main/java/net/minecraftforge/client/event",
                 "src/main/java/net/minecraftforge/event",
                 "src/main/java/cpw/mods/fml/common/event",
                 "src/main/java/cpw/mods/fml/common/gameevent",
                 "src/main/java/cpw/mods/fml/client/event"
             ],
-        	"source": ["src/main/java"]
+            "source": ["src/main/java"],
+            "eventbus" : [
+                {"cpw.mods.fml.client.event": "fmlevent"},
+                {"cpw.mods.fml.common.gameevent": "fmlevent"},
+                {"cpw.mods.fml.common.event": "fmlconstruction"},
+                {"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+                {"net.minecraftforge.terraingen": "terraingen"},
+                {"net.minecraftforge": "forge"}
+        	]
         },
         {
             "mcversion": "1.8",
@@ -75,12 +115,21 @@
             "classifier": "beta",
             "versionFormat": "{0}-{1}-{0}/forge-{0}-{1}-{0}-userdev.jar",
             "packages": [
+                "src/main/java/net/minecraftforge/client/event",
                 "src/main/java/net/minecraftforge/event",
                 "src/main/java/net/minecraftforge/fml/common/event",
                 "src/main/java/net/minecraftforge/fml/common/gameevent",
                 "src/main/java/net/minecraftforge/fml/client/event"
             ],
-        	"source": ["src/main/java"]
+            "source": ["src/main/java"],
+            "eventbus" : [
+                  {"net.minecraftforge.fml.client.event": "fmlevent"},
+                  {"net.minecraftforge.fml.common.gameevent": "fmlevent"},
+                  {"net.minecraftforge.fml.common.event": "fmlconstruction"},
+                  {"net.minecraftforge.terraingen.OreGenEvent": "oregen"},
+                  {"net.minecraftforge.terraingen": "terraingen"},
+                  {"net.minecraftforge": "forge"}
+          	]
         }
     ]
 }
