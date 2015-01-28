@@ -101,13 +101,13 @@ function downloadFiles(gcallback) {
 
 function createCSV(gcallback) {
 	var csvname = config.dataPath + "/global.csv";
-	if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
+	if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
 		
 	fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
 	for (var key in forgeconfig.versions) {
 		var version = forgeconfig.versions[key];
 		var csvname = config.dataPath + "/" + version.mcversion + ".csv";
-		if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
+		if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
 	}
 	gcallback.call();
 }
