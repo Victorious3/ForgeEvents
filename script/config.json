@@ -1,6 +1,5 @@
 {
     "//": "Specify the java home directory if needed, 'javaHome = path'",
-    "javaHome": "C:/Program Files/java/jdk1.8.0_25",
     "docletPath": "../build/libs/ForgeEvents.jar",
     "dataPath": "data",
     "mySQL": {
