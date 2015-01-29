@@ -139,6 +139,7 @@ function parseCSVPatches(gcallback) {
 	
 	getVersionList = function(matches) {
 		if (matches.startsWith("@")) return versions.slice();
+		matches = matches.split(",")[0];
 		var ret = [];
 		var splitted = matches.split(";");
 		for (var i in splitted) {
@@ -223,7 +224,7 @@ function applyCSVPatches(gcallback) {
 			var table = version.mcversion.replace(/\./g, "_");
 			for (var key in csvPatches[version.mcversion]) {
 				var data = csvPatches[version.mcversion][key].split(",");
-				console.log(data);
+				console.log(data.toString());
 				sqlqueries.push(extractSQLQuery(csvPatches.columns, data, table));
 			}
 			console.log("Query database");

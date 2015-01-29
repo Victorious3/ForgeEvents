@@ -1,6 +1,6 @@
 name,description,eventbus,side
-DrawBlockHighlightEvent,Fired on the client when a block is about to be highlighted (mouse over)
-@@1.4.7++
+DrawBlockHighlightEvent,Fired on the client when a block is about to be highlighted (mouse over),,
+@@1.4.7++,,,
 BiomeEvent.GetWaterColor,,forge,1
 BiomeEvent.GetGrassColor,,forge,1
 BiomeEvent.GetFoliageColor,,forge,1
