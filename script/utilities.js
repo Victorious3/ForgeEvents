@@ -2,6 +2,7 @@ var fs = require("fs");
 var http = require('http');
 var exports = module.exports = {};
 
+//String helper
 if (!String.prototype.format) {
 	String.prototype.format = function() {
 		var args = arguments;
@@ -14,6 +15,18 @@ if (!String.prototype.format) {
 if (!String.prototype.startsWith) {
 	String.prototype.startsWith = function (str) {
 		return this.indexOf(str) == 0;
+	};
+}
+
+if (!String.prototype.endsWith) {
+	String.prototype.endsWith = function(suffix) {
+		return this.indexOf(suffix, this.length - suffix.length) !== -1;
+	};
+}
+
+if (!String.prototype.contains) {
+	String.prototype.contains = function(match) { 
+		return this.indexOf(match) != -1; 
 	};
 }
 

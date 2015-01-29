@@ -3,7 +3,6 @@ var path 	= require("path");
 var async 	= require("async");
 var admzip 	= require("adm-zip");
 var mysql 	= require("mysql");
-var csv 	= require("csv-parse");
 var spawn 	= require('child_process').spawn;
 
 var utils 	= require("./utilities.js");
@@ -36,20 +35,41 @@ for (var key in forgeconfig["versions"]) {
 	version["zipfile"] = version["fdir"] + "/" + version["mcversion"] + "-" + version["forgeversion"] + ".zip";
 }
 
+//Generate minecraft version array
+var versions = [];
+for (var key in forgeconfig.versions) {
+	versions.push(forgeconfig.versions[key].mcversion);
+}
+
+//Sort minecraft versions
+versions.sort(function(a, b) {
+	if (a === b) return 0;
+	var acomp = a.split(".");
+	var bcomp = b.split(".");
+	var len = Math.max(acomp.length, acomp.length);
+	for (var i = 0; i < len; i++) {
+		var aval = acomp[i] || 0;
+		var bval = bcomp[i] || 0;
+		if (parseInt(aval) > parseInt(bval)) return 1;
+		if (parseInt(aval) < parseInt(bval)) return -1;
+	}
+	return 0;
+});
+
 if (!fs.existsSync(config.dataPath)) fs.mkdirSync(config.dataPath);
 var files = fs.readdirSync(config.dataPath);
 
 var tasks = {
 	downloadFiles : [downloadFiles],
 	decompress : [downloadFiles],
-	createCSV : [createCSV],
-	applyCSV : [applyCSV],
+	parseCSVPatches : [parseCSVPatches],
+	applyCSVPatches : [applyCSVPatches],
 	createDoclet : [createDoclet],
 	createHTML : [createHTML],
 	
-	all : [downloadFiles, decompress, createCSV, createDoclet, applyCSV, createHTML],
-	update : [downloadFiles, decompress, createCSV, applyCSV],
-	csv : [createCSV, applyCSV],
+	all : [downloadFiles, decompress, parseCSVPatches, createDoclet, applyCSVPatches, createHTML],
+	update : [downloadFiles, decompress, parseCSVPatches, applyCSVPatches],
+	csv : [parseCSVPatches, applyCSVPatches],
 	doc : [createDoclet, createHTML]
 }
 
@@ -67,6 +87,7 @@ if (args.length > 0) {
 //Run tasks
 async.series(task, function(error) {
 	if(error) console.error("Terminated!");
+	process.exit(-1);
 });
 
 function downloadFiles(gcallback) {
@@ -104,79 +125,111 @@ function downloadFiles(gcallback) {
 	});
 }
 
-function createCSV(gcallback) {
-	console.log("Creating csv patches...");
+var csvPatches;
+
+function parseCSVPatches(gcallback) {
+	console.log("Parsing csv patches...");
+	var patchdir = config.dataPath + "/patches";
+	var patches = fs.readdirSync(patchdir);
 	
-	var csvname = config.dataPath + "/global.csv";
-	if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
-		
-	fs.writeFileSync(csvname, "name;description;eventbus;side", {flag: "w"});
-	for (var key in forgeconfig.versions) {
-		var version = forgeconfig.versions[key];
-		var csvname = config.dataPath + "/" + version.mcversion + ".csv";
-		if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
+	csvPatches = {};
+	for (var i in versions) {
+		csvPatches[versions[i]] = [];
 	}
-	gcallback.call();
+	
+	getVersionList = function(matches) {
+		if (matches.startsWith("@")) return versions.slice();
+		var ret = [];
+		var splitted = matches.split(";");
+		for (var i in splitted) {
+			var match = splitted[i];
+			if (match.contains("--")) {
+				var sub = match.split("--")[0];
+				if (!sub in versions) return "Illegal version id";
+				ret = ret.concat(versions.slice(0, versions.indexOf(sub) + 1));
+			} else if (match.contains("\+\+")) {
+				var sub = match.split("\+\+")[0];
+				if (!sub in versions) return "Illegal version id";
+				ret = ret.concat(versions.slice(versions.indexOf(sub)));
+			} else if (match.contains("-")) {
+				var sub = match.split("-");
+				if (sub.length != 2) return "Illegal version range";
+				var start = sub[0];
+				var end = sub[1];
+				if (!start in versions || !end in versions) return "Illegal version id";
+				ret = ret.concat(versions.slice(versions.indexOf(start), versions.indexOf(end) + 1));
+			} else {
+				if (!match in versions) return "Illegal version id";
+				ret.push(match);
+			}
+		}
+		return ret;
+	}
+	
+	async.each(patches, function(patch, callback){
+		if(!patch.endsWith(".csv")) {
+			callback();
+			return;
+		}
+		
+		patch = patchdir + "/" + patch;
+		console.log("Parsing patch " + patch);
+		
+		var versionlist = versions.slice();
+		
+		var rawPatch = fs.readFileSync(patch, "utf-8").split("\r\n");
+		if (rawPatch.length > 1) {
+			csvPatches["columns"] = rawPatch[0].split(",");
+			for (var i = 1; i < rawPatch.length; i++) {
+				var patch = rawPatch[i];
+				if (patch.startsWith("@@")) {
+					versionlist = getVersionList(patch.substring(2));
+					if(typeof versionlist == "string") {
+						callback.call(versionlist);
+						return;
+					}
+				} else {
+					for (var j in versionlist) {
+						csvPatches[versionlist[j]].push(patch);
+					}
+				}
+			}
+		}
+		callback.call();
+	}, gcallback);
 }
 
-function applyCSV(gcallback) {	
+function applyCSVPatches(gcallback) {
+	
 	console.log("Applying csv patches...");
-	
-	var connection = mysql.createConnection(config.mySQL);
-	var tasks = [];
-	var csvfile = fs.readFileSync(config.dataPath + "/global.csv", "utf-8");
-	var globalcsv = [];
-	
-	tasks.push(function(callback) { connectToDatabase(connection, callback) });
-	
-	tasks.push(function(callback) {
-		var parser = csv(csvfile, {
-			delimiter: ","
-		}, function(err, data) {
-			globalcsv = data;
-			callback.call(err);
-		});
-	});
-	
-	applyPatches = function(csv, callback) {
-		if(csv.length > 1) {
-			var sqlqueries = [];
-			var table = version.mcversion.replace(/\./g, "_");
-			for (var i = 1; i < csv.length; i++) {
-				sqlqueries.push(extractSQLQuery(csv[0], csv[i], table));
-			}
-			async.eachSeries(sqlqueries, function(query, callback) {
-				console.log(query);
-				connection.query(query, callback);
-			}, callback);
-		} else callback.call();
+	if(!csvPatches) {
+		console.log("No patches provided! You may want to run 'parseCSVPatches' first ");
+		gcallback.call();
+		return;
 	}
 	
-	async.parallel(tasks, function(error) {
-		if(error) {
+	var connection = mysql.createConnection(config.mySQL);
+	connectToDatabase(connection, function(error) {
+		if (error) {
 			gcallback.call(error);
-		} else {
-			async.eachSeries(forgeconfig.versions, function(version, callback) {
-				var localcsv;
-				async.series([function(callback) {
-					var localcsvfile = fs.readFileSync(config.dataPath + "/" + version.mcversion + ".csv", "utf-8");
-					var parser = csv(localcsvfile, {
-						delimiter: ","
-					}, function(err, data) {
-						localcsv = data;
-						callback.call(err);
-					}); 
-				}, function(callback) {
-					console.log("Applying global csv patches for " + version.mcversion + "-" + version.forgeversion);
-					applyPatches(globalcsv, callback);
-				}, function(callback) {
-					console.log("Applying local csv patches for " + version.mcversion + "-" + version.forgeversion);
-					applyPatches(localcsv, callback);
-				}], callback);
-			}, function(err) {
-				connection.destroy();
-				gcallback.call(error);
-			});
+			return;
+		}
+		
+		for (var key in forgeconfig.versions) {
+			var version = forgeconfig.versions[key];
+			console.log("Applying csv patches for " + version.mcversion);
+			
+			var sqlqueries = [];
+			var table = version.mcversion.replace(/\./g, "_");
+			for (var key in csvPatches[version.mcversion]) {
+				var data = csvPatches[version.mcversion][key].split(",");
+				console.log(data);
+				sqlqueries.push(extractSQLQuery(csvPatches.columns, data, table));
+			}
+			console.log("Query database");
+			async.eachSeries(sqlqueries, function(query, callback) {
+				connection.query(query, callback);
+			}, gcallback);
 		}
 	});
 }
@@ -243,10 +296,10 @@ function createDoclet(gcallback) {
 			})
 			var args = [
 				"-path", path.resolve(__dirname), 
-			    "-forgeversion", JSON.stringify(version), 
-			    "-subpackages", "net:cpw", "-doclet", "ForgeDoclet", 
-			    "-docletpath", config.docletPath, 
-			    "-sourcepath", sourcepath
+				"-forgeversion", JSON.stringify(version), 
+				"-subpackages", "net:cpw", "-doclet", "ForgeDoclet", 
+				"-docletpath", config.docletPath, 
+				"-sourcepath", sourcepath
 			];
 			console.log("Running java doclet for " + version.fdir);
 			
