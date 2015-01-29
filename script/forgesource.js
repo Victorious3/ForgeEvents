@@ -3,6 +3,7 @@ var path 	= require("path");
 var async 	= require("async");
 var admzip 	= require("adm-zip");
 var mysql 	= require("mysql");
+var csv 	= require("csv-parse");
 var spawn 	= require('child_process').spawn;
 
 var utils 	= require("./utilities.js");
@@ -42,11 +43,13 @@ var tasks = {
 	downloadFiles : [downloadFiles],
 	decompress : [downloadFiles],
 	createCSV : [createCSV],
+	applyCSV : [applyCSV],
 	createDoclet : [createDoclet],
 	createHTML : [createHTML],
 	
-	all : [downloadFiles, decompress, createCSV, createDoclet, createHTML],
-	update : [downloadFiles, decompress, createCSV],
+	all : [downloadFiles, decompress, createCSV, createDoclet, applyCSV, createHTML],
+	update : [downloadFiles, decompress, createCSV, applyCSV],
+	csv : [createCSV, applyCSV],
 	doc : [createDoclet, createHTML]
 }
 
@@ -62,7 +65,9 @@ if (args.length > 0) {
 }
 
 //Run tasks
-async.series(task);
+async.series(task, function(error) {
+	if(error) console.error("Terminated!");
+});
 
 function downloadFiles(gcallback) {
 	//Array of files to download asynchronous
@@ -100,6 +105,8 @@ function downloadFiles(gcallback) {
 }
 
 function createCSV(gcallback) {
+	console.log("Creating csv patches...");
+	
 	var csvname = config.dataPath + "/global.csv";
 	if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
 		
@@ -110,6 +117,94 @@ function createCSV(gcallback) {
 		if(!fs.existsSync(csvname)) fs.writeFileSync(csvname, "name,description,eventbus,side", {flag: "w"});
 	}
 	gcallback.call();
+}
+
+function applyCSV(gcallback) {	
+	console.log("Applying csv patches...");
+	
+	var connection = mysql.createConnection(config.mySQL);
+	var tasks = [];
+	var csvfile = fs.readFileSync(config.dataPath + "/global.csv", "utf-8");
+	var globalcsv = [];
+	
+	tasks.push(function(callback) { connectToDatabase(connection, callback) });
+	
+	tasks.push(function(callback) {
+		var parser = csv(csvfile, {
+			delimiter: ","
+		}, function(err, data) {
+			globalcsv = data;
+			callback.call(err);
+		});
+	});
+	
+	applyPatches = function(csv, callback) {
+		if(csv.length > 1) {
+			var sqlqueries = [];
+			var table = version.mcversion.replace(/\./g, "_");
+			for (var i = 1; i < csv.length; i++) {
+				sqlqueries.push(extractSQLQuery(csv[0], csv[i], table));
+			}
+			async.eachSeries(sqlqueries, function(query, callback) {
+				console.log(query);
+				connection.query(query, callback);
+			}, callback);
+		} else callback.call();
+	}
+	
+	async.parallel(tasks, function(error) {
+		if(error) {
+			gcallback.call(error);
+		} else {
+			async.eachSeries(forgeconfig.versions, function(version, callback) {
+				var localcsv;
+				async.series([function(callback) {
+					var localcsvfile = fs.readFileSync(config.dataPath + "/" + version.mcversion + ".csv", "utf-8");
+					var parser = csv(localcsvfile, {
+						delimiter: ","
+					}, function(err, data) {
+						localcsv = data;
+						callback.call(err);
+					}); 
+				}, function(callback) {
+					console.log("Applying global csv patches for " + version.mcversion + "-" + version.forgeversion);
+					applyPatches(globalcsv, callback);
+				}, function(callback) {
+					console.log("Applying local csv patches for " + version.mcversion + "-" + version.forgeversion);
+					applyPatches(localcsv, callback);
+				}], callback);
+			}, function(err) {
+				connection.destroy();
+				gcallback.call(error);
+			});
+		}
+	});
+}
+
+function connectToDatabase(connection, callback) {
+	console.log("Connecting to MySQL database...");
+	connection.connect(function(error) {
+		if (error) {
+			console.error("Error connecting: " + err.stack);
+			callback.call(error);
+		} else {
+			console.log("Connected as id " + connection.threadId);
+			
+			connection.query(mysql.format("USE ??", config.database), function(error, result){
+				callback.call(error);
+			});
+		}
+	});
+}
+
+function extractSQLQuery(sql, row, table) {
+	var querySet = {};
+	for (var i = 1; i < row.length; i++) {
+		if (row[i] && !(0 === row[i].length)) {
+			querySet[sql[i]] = row[i];
+		}
+	}
+	return mysql.format("UPDATE ?? SET ? WHERE name LIKE ?", [table, querySet, row[0]]);
 }
 
 function decompress(gcallback) {

@@ -1,1 +1,4 @@
-name;description;eventbus;side
+name,description,eventbus,side
+BiomeEvent.GetWaterColor,,forge,1
+BiomeEvent.GetGrassColor,,forge,1
+BiomeEvent.GetFoliageColor,,forge,1

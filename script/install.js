@@ -2,7 +2,7 @@ var exec 	= require("child_process").exec;
 var path 	= require("path");
 var fs		= require("fs");
 
-var packages = ["adm-zip", "async", "mysql"];
+var packages = ["adm-zip", "async", "mysql", "csv-parse"];
 
 console.log("Installing required packages...");
 var pointer = 0;
