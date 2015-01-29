@@ -32,6 +32,7 @@ Server | Client | Both
 * If the patch is dedicated to a single version, create a new file for it or change an existing file named 'X.X.X.csv'
 * Order the patches in such a way that the amount of targets specified is down to a minumum
 * Don't pach the same Event twice
+* Be precise! Applying a patch to something that doesn't exist makes a difference, performance wise
 
 #### Bad
 ````
