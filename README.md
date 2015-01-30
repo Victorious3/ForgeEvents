@@ -27,7 +27,7 @@ Server | Client | Both
   * `@` is a wildcard for any version
   * `X.X.X++` includes every version ater the specifed version, including itself
   * `X.X.X--` includes every version prior to the specifed version, including itslef
-  * `X.X.X--X.Y.Y` includes every version from X.X.X to X.Y.Y, including themselves
+  * `X.X.X-X.Y.Y` includes every version from X.X.X to X.Y.Y, including themselves
   * You can concat multiple ones of these targets with `;`
 * If the patch is dedicated to a single version, create a new file for it or change an existing file named 'X.X.X.csv'
 * Order the patches in such a way that the amount of targets specified is down to a minumum
