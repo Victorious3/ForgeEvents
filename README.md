@@ -33,6 +33,10 @@ Server | Client | Both
 * Order the patches in such a way that the amount of targets specified is down to a minumum
 * Don't patch the same Event twice, always look for an existing patch first
 * Be precise! Applying a patch to something that doesn't exist makes a difference, performance wise
+* Additonally, there are some special statements for use inside a column
+  * `@+` in front of a statement will only apply the given data when the source column (Unpatched!) was initially empty
+  * `@X.X.X@` will insert the data from the related version (Unpatched!) You can concat as many of these as you like
+  * `\,` will escape a comma
 
 #### Bad
 ````
