@@ -80,14 +80,16 @@ if (args.length > 0) {
 	} else {
 		console.error("Undefined task '" + args[0] + "'");
 		console.log("Tasks: " + Object.keys(tasks));
-		process.exit(-1);
+		utils.exit(-1);
 	}
 }
 
 //Run tasks
 async.series(task, function(error) {
-	if(error) console.error("Terminated!");
-	process.exit(-1);
+	if(error) {
+		console.error("Terminated!");
+		utils.exit(-1);
+	} else utils.exit(0);
 });
 
 function downloadFiles(gcallback) {
@@ -105,7 +107,7 @@ function downloadFiles(gcallback) {
 	
 	//Remove outdated folders
 	for (var i = 0; i < files.length; i++) {
-		if(files[i] == undefined) continue;
+		if(files[i] == undefined || files[i] == ".gitignore" || files[i] == "patches") continue;
 		var dir = config.dataPath + "/" + files[i];
 		utils.deleteFolderRecursive(dir);
 	}
@@ -146,21 +148,21 @@ function parseCSVPatches(gcallback) {
 			var match = splitted[i];
 			if (match.contains("--")) {
 				var sub = match.split("--")[0];
-				if (!sub in versions) return "Illegal version id";
+				if (versions.indexOf(sub) == -1) return "Illegal version id";
 				ret = ret.concat(versions.slice(0, versions.indexOf(sub) + 1));
 			} else if (match.contains("\+\+")) {
 				var sub = match.split("\+\+")[0];
-				if (!sub in versions) return "Illegal version id";
+				if (versions.indexOf(sub) == -1) return "Illegal version id";
 				ret = ret.concat(versions.slice(versions.indexOf(sub)));
 			} else if (match.contains("-")) {
 				var sub = match.split("-");
 				if (sub.length != 2) return "Illegal version range";
 				var start = sub[0];
 				var end = sub[1];
-				if (!start in versions || !end in versions) return "Illegal version id";
+				if (versions.indexOf(start) == -1 || versions.indexOf(end) == -1) return "Illegal version id";
 				ret = ret.concat(versions.slice(versions.indexOf(start), versions.indexOf(end) + 1));
 			} else {
-				if (!match in versions) return "Illegal version id";
+				if (versions.indexOf(match) == -1) return "Illegal version id";
 				ret.push(match);
 			}
 		}
@@ -178,7 +180,7 @@ function parseCSVPatches(gcallback) {
 		
 		var versionlist = versions.slice();
 		
-		var rawPatch = fs.readFileSync(patch, "utf-8").split("\r\n");
+		var rawPatch = fs.readFileSync(patch, "utf-8").split(/\n/);
 		if (rawPatch.length > 1) {
 			csvPatches["columns"] = rawPatch[0].split(",");
 			for (var i = 1; i < rawPatch.length; i++) {
@@ -205,7 +207,7 @@ function applyCSVPatches(gcallback) {
 	console.log("Applying csv patches...");
 	if(!csvPatches) {
 		console.log("No patches provided! You may want to run 'parseCSVPatches' first ");
-		gcallback.call();
+		setTimeout(gcallback, 1);
 		return;
 	}
 	
@@ -215,23 +217,32 @@ function applyCSVPatches(gcallback) {
 			gcallback.call(error);
 			return;
 		}
-		
-		for (var key in forgeconfig.versions) {
-			var version = forgeconfig.versions[key];
-			console.log("Applying csv patches for " + version.mcversion);
-			
+
+		async.eachSeries(forgeconfig.versions, function(version, callback) {
+			console.log("Applying csv patches for " + version.mcversion);		
 			var sqlqueries = [];
 			var table = version.mcversion.replace(/\./g, "_");
 			for (var key in csvPatches[version.mcversion]) {
-				var data = csvPatches[version.mcversion][key].split(",");
-				console.log(data.toString());
-				sqlqueries.push(extractSQLQuery(csvPatches.columns, data, table));
+				var data = utils.parseCSVRow(csvPatches[version.mcversion][key]);
+				
+				var query;
+				try {
+					query = extractSQLQuery(csvPatches.columns, data, table);
+				} catch (error) {
+					console.log("Illegal patch [" + data.toString() + "] at index " + key + ": " + error);
+					continue;
+				}
+				console.log("[" + data.toString() + "]");
+				sqlqueries.push(query);
 			}
 			console.log("Query database");
 			async.eachSeries(sqlqueries, function(query, callback) {
 				connection.query(query, callback);
-			}, gcallback);
-		}
+			}, callback);
+		}, function(error) {
+			connection.destroy();
+			gcallback.call(error);
+		});
 	});
 }
 
@@ -258,7 +269,82 @@ function extractSQLQuery(sql, row, table) {
 			querySet[sql[i]] = row[i];
 		}
 	}
-	return mysql.format("UPDATE ?? SET ? WHERE name LIKE ?", [table, querySet, row[0]]);
+	
+	var versionTags = [table];
+	for (var key in querySet) {
+		var query = querySet[key];
+		if (query.contains("@")) {
+			var update = false;
+			if (query.startsWith("@\+")) {
+				query = query.substring(2);
+				update = true;
+			}
+			
+			var index = 0;
+			var index2 = query.indexOf("@");
+			if (index2 != -1) {
+				var query2 = [];
+				while (index2 < query.length) {
+					if (index2 == -1) {
+						var text = query.substring(index, query.length);
+						if (text.length > 0) query2.push(mysql.escape(text));
+						break;
+					} else {
+						var text = query.substring(index, index2);
+						if (text.length > 0) query2.push(mysql.escape(text));
+						var index3 = query.indexOf("@", index2 + 1);
+						if (index3 == -1) throw "Unfinished version insertion tag";
+						var version = query.substring(index2 + 1, index3);
+						if (versions.indexOf(version) == -1) throw "Illegal version insertion tag";
+						version = "raw_" + version.replace(/\./g, "_");
+						query2.push("`" + version + "`." + key);
+						if (versionTags.indexOf(version) == -1) versionTags.push(version);
+						index2 = index3;
+					}
+					index = index2 + 1;
+					index2 = query.indexOf("@", index);
+				}
+				if(query2.length > 1) {
+					query = "CONCAT(" + query2.toString() + ")";
+				} else {
+					query = query2[0];
+				}
+			}
+			else query = mysql.escape(query);
+			if (update) {
+				if (versionTags.indexOf("raw_" + table) == -1) versionTags.push("raw_" + table);
+				query = "IF(`raw_" + table + "`." + key + " IS NULL OR `raw_" + table + "`." + key + " = '', " + query + ", `raw_" + table + "`." + key + ")";
+			}
+		} else query = mysql.escape(query);
+		querySet[key] = query;
+	}
+	
+	var fullquery = "";
+	var index = 0;
+	var size = Object.keys(querySet).length;
+	var needsIdentifier = versionTags.length > 1;
+	
+	for (var key in querySet) {
+		fullquery += needsIdentifier ? "`" + table + "`." + key : key;
+		fullquery += " = " + querySet[key];
+		if (index < size - 1) {
+			fullquery += ", ";
+		}
+		index++;
+	}
+	
+	var where = "";
+	if (needsIdentifier) {
+		var escaped = mysql.escape(row[0]);
+		for (var i in versionTags) {
+			where += "`" + versionTags[i].replace(/\./g, "_") + "`.name LIKE " + escaped;
+			if (i < versionTags.length - 1) {
+				where += " AND ";
+			}
+		}
+	} else where = "name LIKE " + mysql.escape(row[0]);
+	
+	return mysql.format("UPDATE ?? SET " + fullquery + " WHERE " + where, [versionTags]);
 }
 
 function decompress(gcallback) {
@@ -309,7 +395,7 @@ function createDoclet(gcallback) {
 			prc.stderr.pipe(process.stderr);
 
 			prc.on("close", function(err) {	
-				callback();
+				callback.call();
 			});
 		}
 	}, function(err) {

@@ -31,12 +31,16 @@ public class ForgeDoclet extends Doclet
 	
 	public static boolean start(RootDoc root)
 	{
+		boolean forceUpdate = false;
+		
 		String path = "";
 		for(String[] options : root.options())
 		{
 			if(options[0].equals("-path")) path = options[1];
 			else if(options[0].equals("-forgeversion"))
 				version = new JsonParser().parse(options[1]).getAsJsonObject();
+			else if(options[0].equals("-force"))
+				forceUpdate = true;
 		}
 		
 		File rootFolder = new File(path);
@@ -104,7 +108,7 @@ public class ForgeDoclet extends Doclet
 				String name = classdoc.typeName();
 				String classname = classdoc.qualifiedName();
 				String superclass = classdoc.superclass() != null ? classdoc.superclass().qualifiedName() : "java.lang.Object";
-				boolean side = classname.contains("client");
+				int side = classname.contains("client") ? 1 : 2;
 
 				JsonArray fieldsJson = new JsonArray();
 				for(FieldDoc fielddoc : classdoc.fields())
@@ -134,7 +138,7 @@ public class ForgeDoclet extends Doclet
 				
 				if(previousVersion != null) 
 				{
-					res = executeSQLQuery("SELECT since FROM " + previousVersion + " WHERE name = ?", name);
+					res = executeSQLQuery("SELECT since FROM raw_" + previousVersion + " WHERE name = ?", name);
 					if(res.next()) since = res.getString(1);
 					res.close();
 				}
@@ -157,7 +161,7 @@ public class ForgeDoclet extends Doclet
 				root.printNotice("[" + name + " fields: " + fields.toString() + ", result: " + result + ", eventbus: " + eventbus + ", since: " + since + ", deprecated: " + deprecated + "]");
 				root.printNotice("Pushing to database...");
 				
-				executeSQLUpdate("INSERT INTO " + escapedName + " (name, class, superclass, fields, description, eventbus, since, result, side, deprecated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+				executeSQLUpdate("INSERT INTO raw_" + escapedName + " (name, class, superclass, fields, description, eventbus, since, result, side, deprecated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
 					name, classname, superclass, fields, description, eventbus, since, result, side, deprecated);
 				
 				root.printNotice("...success!");
@@ -165,6 +169,24 @@ public class ForgeDoclet extends Doclet
 		} catch (SQLException e) {
 			root.printError("SQL error. Some changes might be discarted.");
 			e.printStackTrace();
+		}
+		
+		try {
+			executeSQLQuery("SELECT 1 FROM " + escapedName + " LIMIT 1");
+		} catch (SQLException e) {
+			forceUpdate = true;
+		}
+		
+		if(forceUpdate) 
+		{
+			root.printNotice("Cloning raw table to production table");
+			try {
+				executeSQLUpdate("CREATE TABLE IF NOT EXISTS " + escapedName +  " LIKE raw_" + escapedName);
+				executeSQLUpdate("INSERT " + escapedName + " SELECT * FROM raw_" + escapedName);
+			} catch (SQLException e2) {
+				root.printError("Counldn't create the production table! Some changes might be discarted.");
+				e2.printStackTrace();
+			}
 		}
 		
 		try {
@@ -215,7 +237,7 @@ public class ForgeDoclet extends Doclet
 		Statement statement = mysql.createStatement();
 		statement.execute("CREATE DATABASE IF NOT EXISTS " + config.get("database").getAsString());
 		statement.execute("USE " + config.get("database").getAsString());
-		statement.execute("CREATE TABLE IF NOT EXISTS " + escapedName + " ("
+		statement.execute("CREATE TABLE IF NOT EXISTS raw_" + escapedName + " ("
 			+ "id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,"
 			+ "name TINYTEXT NOT NULL,"
 			+ "class TINYTEXT NOT NULL,"
@@ -225,10 +247,10 @@ public class ForgeDoclet extends Doclet
 			+ "eventbus TINYTEXT,"
 			+ "since TINYTEXT,"
 			+ "result TINYINT(1) UNSIGNED,"
-			+ "side BOOLEAN,"
+			+ "side TINYINT(1) UNSIGNED,"
 			+ "deprecated BOOLEAN"
 			+ ")");
-		statement.execute("TRUNCATE TABLE " + escapedName);
+		statement.execute("TRUNCATE TABLE raw_" + escapedName);
 		statement.execute("CREATE TABLE IF NOT EXISTS versions ("
 			+ "tableid VARCHAR(10) NOT NULL PRIMARY KEY,"
 			+ "mcversion VARCHAR(10) NOT NULL,"
@@ -243,6 +265,7 @@ public class ForgeDoclet extends Doclet
 	{
 		if(option.equals("-path")) return 2;
 		else if(option.equals("-forgeversion")) return 2;
+		else if(option.equals("-force")) return 1;
 		return 0;
 	}
 	

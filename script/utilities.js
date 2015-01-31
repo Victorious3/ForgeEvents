@@ -30,6 +30,38 @@ if (!String.prototype.contains) {
 	};
 }
 
+/*
+ * exit
+ * https://github.com/cowboy/node-exit
+ *
+ * Copyright (c) 2013 "Cowboy" Ben Alman
+ * Licensed under the MIT license.
+ */
+exports.exit = function(exitCode, streams) {
+	if (!streams) { streams = [process.stdout, process.stderr]; }
+	var drainCount = 0;
+	function tryToExit() {
+		if (drainCount === streams.length) {
+			process.exit(exitCode);
+		}
+	}
+	streams.forEach(function(stream) {
+		if (stream.bufferSize === 0) {
+			drainCount++;
+		} else {
+			stream.write("", "utf-8", function() {
+				drainCount++;
+				tryToExit();
+			});
+		}
+		stream.write = function() {};
+	});
+	tryToExit();
+	process.on("exit", function() {
+		process.exit(exitCode);
+	});
+};
+
 exports.downloadFile = function(url, dest, cb) {
 	var file = fs.createWriteStream(dest);
 	var request = http.get(url, function(response) {
@@ -55,3 +87,39 @@ exports.deleteFolderRecursive = function(path) {
 	    fs.rmdirSync(path);
 	}
 };
+
+parseCSVRow = function(row) {
+	var columns = [];
+	var index = 0;
+	var index2 = row.indexOf(",");
+	if (index2 != -1) {
+		while (index < row.length) {
+			if (index2 == -1) {
+				var text = row.substring(index, row.length);
+				columns.push(text.replace(/\\,/g, ","));
+				break;
+			}
+			if (row.charAt(index2 - 1) == "\\") {
+				index2 = row.indexOf(",", index2 + 1);
+				continue;
+			}
+			
+			var text = row.substring(index, index2);
+			columns.push(text.replace(/\\,/g, ","));
+			index = index2 + 1;
+			index2 = row.indexOf(",", index);
+		}
+	} else {
+		columns = [row];
+	}
+	return columns;
+}
+
+exports.parseCSVRow = parseCSVRow;
+
+exports.parseCSV = function(csv) {
+	var set = csv.split(/\n/);
+	for (var key in set) {
+		csv[key] = parseCSVRow(csv[key]);
+	}
+}

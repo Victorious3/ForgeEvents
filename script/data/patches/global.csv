@@ -4,3 +4,6 @@ DrawBlockHighlightEvent,Fired on the client when a block is about to be highligh
 BiomeEvent.GetWaterColor,,forge,1
 BiomeEvent.GetGrassColor,,forge,1
 BiomeEvent.GetFoliageColor,,forge,1
+ServerChatEvent,,,0
+@@1.4.7-1.7.10,,,
+ServerChatEvent,@1.8@,,
